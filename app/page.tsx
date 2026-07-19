@@ -31,7 +31,7 @@ export default function Home() {
           <a href="/work">Work</a>
           <a href="/components">Components</a>
           <a href="/services">Services</a>
-          <a href="/career">Career</a>
+          <a href="https://giorgiy-shepov.com/">Career</a>
         </nav>
 
         <a

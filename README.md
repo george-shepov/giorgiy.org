@@ -1,13 +1,15 @@
 # Giorgiy.org
 
-Shared website for Giorgiy Shepov and LODEX Software.
+Primary product, portfolio, component, and services website for Giorgiy Shepov
+and LODEX Software.
 
-The application provides two intentional public identities from one codebase:
+The public web presence uses two intentional repositories:
 
-- **Giorgiy.org** — products, reusable components, software services, and case studies.
-- **Giorgiy-Shepov.com** — a career-focused front door for recruiters and engineering opportunities.
+- **[`giorgiy.org`](https://github.com/george-shepov/giorgiy.org)** — products, reusable components, software services, and case studies.
+- **[`giorgiy-shepov.com`](https://github.com/george-shepov/giorgiy-shepov.com)** — a lightweight career-focused front door for recruiters and engineering opportunities.
 
-They share content and design foundations but are not duplicate mirrors. See
+They share a visual language and cross-link to each other, but they are not
+duplicate mirrors. See
 [`docs/DOMAIN_STRATEGY.md`](docs/DOMAIN_STRATEGY.md) for the canonical and host-routing plan.
 
 ## Current routes
@@ -16,7 +18,7 @@ They share content and design foundations but are not duplicate mirrors. See
 - `/work` — selected product portfolio
 - `/components` — reusable component library
 - `/services` — service offerings
-- `/career` — career-focused homepage
+- `/career` — integrated career-route fallback and design reference
 - `/work/docket-intelligence-workbench` — detailed case study
 
 ## Technology

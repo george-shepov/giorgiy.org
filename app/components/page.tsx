@@ -18,7 +18,7 @@ export default function ComponentsPage() {
           <a href="/work">Work</a>
           <a className="active" href="/components">Components</a>
           <a href="/services">Services</a>
-          <a href="/career">Career</a>
+          <a href="https://giorgiy-shepov.com/">Career</a>
         </nav>
         <a className="inner-contact" href="mailto:gshepov@proton.me?subject=Reusable%20software%20components">Let&apos;s talk ↗</a>
       </header>
