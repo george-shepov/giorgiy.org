@@ -1,0 +1,85 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows:
+      - Validate site
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: giorgiy-org-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEPLOY_HOST: ${{ secrets.GIORGIY_VPS_HOST }}
+      DEPLOY_USER: ${{ secrets.GIORGIY_VPS_USER }}
+      DEPLOY_PORT: ${{ secrets.GIORGIY_VPS_PORT }}
+      DEPLOY_PATH: ${{ secrets.GIORGIY_VPS_PATH }}
+      PUBLIC_URL: https://giorgiy.org
+    steps:
+      - name: Check out validated source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate deployment configuration
+        env:
+          SSH_KEY: ${{ secrets.GIORGIY_VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.GIORGIY_VPS_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_PATH"
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          case "$DEPLOY_PATH" in
+            /srv/*|/var/www/*) ;;
+            *) echo "GIORGIY_VPS_PATH must be below /srv or /var/www"; exit 1 ;;
+          esac
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build static site
+        run: |
+          npm ci
+          npx next build
+          test -f out/index.html
+          printf '{"commit":"%s","deployedAt":"%s"}\n' "$GITHUB_SHA" "$(date -u +%FT%TZ)" > out/site-release.json
+          tar -C out -czf /tmp/giorgiy-org.tgz .
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.GIORGIY_VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.GIORGIY_VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/deploy_key
+
+      - name: Upload and activate
+        run: |
+          scp -P "$DEPLOY_PORT" -i ~/.ssh/deploy_key /tmp/giorgiy-org.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/giorgiy-org.tgz"
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -eu; test -d '$DEPLOY_PATH'; tar -xzf /tmp/giorgiy-org.tgz -C '$DEPLOY_PATH'; rm -f /tmp/giorgiy-org.tgz"
+
+      - name: Verify production
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/site-release.json"
