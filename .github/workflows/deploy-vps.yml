@@ -1,4 +1,5 @@
 name: Deploy production
+run-name: Deploy production ${{ inputs.deploy_sha || github.event.workflow_run.head_sha || github.sha }}
 
 on:
   workflow_run:
@@ -9,6 +10,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: Optional immutable commit SHA to deploy or roll back to
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -28,11 +34,12 @@ jobs:
       DEPLOY_PORT: ${{ secrets.GIORGIY_VPS_PORT }}
       DEPLOY_PATH: ${{ secrets.GIORGIY_VPS_PATH }}
       PUBLIC_URL: https://giorgiy.org
+      DEPLOY_SHA: ${{ inputs.deploy_sha || github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Check out validated source
+      - name: Check out immutable source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Validate deployment configuration
         env:
@@ -43,8 +50,10 @@ jobs:
           test -n "$DEPLOY_USER"
           test -n "$DEPLOY_PORT"
           test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_SHA"
           test -n "$SSH_KEY"
           test -n "$KNOWN_HOSTS"
+          test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
           case "$DEPLOY_PATH" in
             /srv/*/current|/var/www/*/current) ;;
             *) echo "GIORGIY_VPS_PATH must be a current symlink below /srv or /var/www"; exit 1 ;;
@@ -84,6 +93,7 @@ jobs:
           ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
             "set -eu; test -d '$deploy_root'; install -d -m 755 '$release_path'; tar -xzf /tmp/giorgiy-org.tgz -C '$release_path'; find '$release_path' -type d -exec chmod 755 {} +; find '$release_path' -type f -exec chmod 644 {} +; ln -sfn '$release_path' '$DEPLOY_PATH'; rm -f /tmp/giorgiy-org.tgz"
 
-      - name: Verify production
+      - name: Verify production release
         run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/site-release.json"
+          payload="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/site-release.json")"
+          printf '%s' "$payload" | python3 -c 'import json,sys; p=json.load(sys.stdin); expected=sys.argv[1]; actual=p.get("commit"); assert actual == expected, f"expected {expected}, got {actual}"' "$DEPLOY_SHA"
